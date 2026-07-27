@@ -39,7 +39,7 @@
       <tr><th>故障描述</th><th>项目</th><th>所属平台</th><th>级别</th><th>状态</th><th>处理人</th><th>报告</th><th>响应</th><th>响应方式</th><th>解决</th></tr>
       {% for f in faults %}
       <tr>
-        <td>
+        <td class="note-cell">
           <a class="row-link" href="{{ url_for('project_detail', pid=f.project_id) }}">{{ f.title }}</a>
           {% if f.note %}<br><span class="muted" style="font-size:12px;">{{ f.note }}</span>{% endif %}
         </td>
