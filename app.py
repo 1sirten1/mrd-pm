@@ -23,10 +23,10 @@ from io import BytesIO
 import json as _json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "pm.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "pm.db"))
 
 app = Flask(__name__)
-app.secret_key = "pm-lib-secret-key"
+app.secret_key = os.environ.get("SECRET_KEY", "pm-lib-secret-key-2024")
 # 模板改动后自动重载，避免手动重启才能生效（管理库为内部工具，开销可忽略）
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
