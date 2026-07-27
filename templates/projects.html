@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% set active = "projects" %}
+{% block title %}项目 · 项目实施管理库{% endblock %}
+
+{% macro status_tag(s) %}
+  {% if s == '未开始' %}<span class="tag gray">未开始</span>
+  {% elif s == '设计联络阶段' %}<span class="tag" style="background:#f3e8ff;color:#7c3aed;">设计联络阶段</span>
+  {% elif s == '调试中' %}<span class="tag amber">调试中</span>
+  {% elif s == '实施中' %}<span class="tag blue">实施中</span>
+  {% elif s == '已结束' %}<span class="tag green">已结束</span>
+  {% elif s == '售后中' %}<span class="tag blue">售后中</span>
+  {% else %}<span class="tag gray">{{ s }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+  <h1>项目</h1>
+  <p class="sub">管理所有项目，覆盖「开始 → 调试 → 实施 → 结束 → 售后」全过程。</p>
+
+  <div class="toolbar">
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <select name="status" onchange="this.form.submit()">
+        <option value="">全部状态</option>
+        {% for s in PROJECT_STATUS %}<option value="{{ s }}" {% if s==status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+      <select name="platform" onchange="this.form.submit()">
+        <option value="">全部平台</option>
+        {% for p in PLATFORM_OPTIONS %}<option value="{{ p }}" {% if p==platform %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+      <input name="q" value="{{ q }}" placeholder="搜索名称/客户/实施人员">
+      <button class="btn ghost" type="submit">查询</button>
+    </form>
+    <div class="spacer"></div>
+    <button class="btn" onclick="newProject()">+ 新建项目</button>
+  </div>
+
+  <div class="panel" style="padding:0;overflow-x:auto;">
+    <table class="line-table">
+      <tr><th>项目名称</th><th>客户</th><th>实施人员</th><th>所属平台</th><th>状态</th><th>开始</th><th>计划结束</th><th></th></tr>
+      {% for p in projects %}
+      <tr>
+        <td class="proj-name"><a class="row-link" href="{{ url_for('project_detail', pid=p.id) }}" title="{{ p.name }}">{{ p.name }}</a></td>
+        <td>{{ p.customer or '—' }}</td>
+        <td>{{ p.manager or '—' }}</td>
+        <td>{{ p.platform or '—' }}</td>
+        <td>{{ status_tag(p.status) }}</td>
+        <td>{{ fmtDate(p.start_date) }}</td>
+        <td>{{ fmtDate(p.plan_end_date) }}</td>
+        <td class="actions">
+          <button class="btn ghost sm" onclick="editProject({{ p.id }})">编辑</button>
+          <button class="btn danger sm" onclick="delProject({{ p.id }}, '{{ p.name }}')">删除</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8"><div class="empty">还没有项目，点击右上角「新建项目」开始</div></td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+<script>
+// 服务端把项目列表序列化为 JS 映射，编辑时按 id 取数，避免内联 JSON 引号冲突
+const PROJECTS = {};
+( {{ projects|tojson }} ).forEach(p => { PROJECTS[p.id] = p; });
+
+function projectForm(p) {
+  p = p || {};
+  const opts = {{ PROJECT_STATUS|tojson }};
+  const statusOpts = opts.map(s => `<option ${s===p.status?'selected':''}>${s}</option>`).join('');
+  const plats = {{ PLATFORM_OPTIONS|tojson }};
+  const platOpts = `<option value="">未设置</option>` + plats.map(s => `<option ${s===p.platform?'selected':''}>${s}</option>`).join('');
+  const isEdit = !!p.id;
+  return `
+    <h3>${isEdit ? '编辑项目' : '新建项目'}</h3>
+    <div class="form-grid">
+      <div class="full"><label>项目名称 *</label><input id="f_name" value="${p.name||''}"></div>
+      <div><label>客户</label><input id="f_customer" value="${p.customer||''}"></div>
+      <div><label>实施人员</label><input id="f_manager" value="${p.manager||''}"></div>
+      <div><label>所属平台</label><select id="f_platform">${platOpts}</select></div>
+      <div><label>状态</label><select id="f_status">${statusOpts}</select></div>
+      <div><label>开始日期</label><input id="f_start" type="date" value="${p.start_date||''}"></div>
+      <div><label>计划结束</label><input id="f_plan" type="date" value="${p.plan_end_date||''}"></div>
+      <div><label>实际结束</label><input id="f_actual" type="date" value="${p.actual_end_date||''}"></div>
+      <div class="full"><label>描述</label><textarea id="f_desc" rows="3">${p.description||''}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeModal()">取消</button>
+      <button class="btn" onclick="saveProject(${p.id||null})">保存</button>
+    </div>`;
+}
+
+function newProject(){ openModal(projectForm()); }
+function editProject(id){ openModal(projectForm(PROJECTS[id])); }
+
+async function saveProject(id){
+  const data = {
+    name: document.getElementById('f_name').value.trim(),
+    customer: document.getElementById('f_customer').value.trim(),
+    manager: document.getElementById('f_manager').value.trim(),
+    platform: document.getElementById('f_platform').value,
+    status: document.getElementById('f_status').value,
+    start_date: document.getElementById('f_start').value,
+    plan_end_date: document.getElementById('f_plan').value,
+    actual_end_date: document.getElementById('f_actual').value,
+    description: document.getElementById('f_desc').value.trim(),
+  };
+  if(!data.name){ alert('项目名称不能为空'); return; }
+  if(id){
+    if(await apiCall('/api/projects/'+id, 'PUT', data)) location.reload();
+  } else {
+    const r = await apiCall('/api/projects', 'POST', data);
+    if(r) location.reload();
+  }
+}
+
+async function delProject(id, name){
+  if(!confirm('确认删除项目「'+name+'」？相关任务与故障也会一并删除。')) return;
+  if(await apiCall('/api/projects/'+id, 'DELETE', {})) location.reload();
+}
+</script>
+{% endblock %}

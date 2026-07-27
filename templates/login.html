@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 项目实施管理库</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #eef2f7 0%, #d8e2f0 100%);
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .card {
+      background: #fff; border-radius: 16px; box-shadow: 0 2px 20px rgba(20,40,80,.12);
+      padding: 40px 36px; width: 100%; max-width: 400px;
+    }
+    .card h1 { font-size: 22px; margin: 0 0 6px; color: #1f2d3d; }
+    .card .sub { color: #7a869a; font-size: 14px; margin: 0 0 28px; }
+    .field { margin-bottom: 18px; }
+    .field label { display: block; font-size: 13px; color: #7a869a; margin-bottom: 6px; }
+    .field input {
+      width: 100%; padding: 10px 12px; border: 1px solid #dde2eb; border-radius: 10px;
+      font-size: 15px; font-family: inherit; outline: none; background: #f9fafc;
+    }
+    .field input:focus { border-color: #2f6fed; background: #fff; }
+    .btn {
+      width: 100%; padding: 11px 0; border: none; border-radius: 10px;
+      background: #2f6fed; color: #fff; font-size: 15px; font-weight: 600;
+      cursor: pointer; margin-top: 6px; font-family: inherit;
+    }
+    .btn:hover { background: #2257c4; }
+    .error { background: #fde6e4; color: #c0392b; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>项目实施管理库</h1>
+    <p class="sub">请登录后使用</p>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post">
+      <div class="field">
+        <label>用户名</label>
+        <input name="username" type="text" autocomplete="username" placeholder="admin" autofocus>
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input name="password" type="password" autocomplete="current-password" placeholder="admin123">
+      </div>
+      <button class="btn" type="submit">登 录</button>
+    </form>
+  </div>
+</body>
+</html>

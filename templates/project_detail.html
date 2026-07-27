@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% set active = "projects" %}
+{% block title %}{{ proj.name }} · 项目实施管理库{% endblock %}
+
+{% macro status_tag(s) %}
+  {% if s == '未开始' %}<span class="tag gray">未开始</span>
+  {% elif s == '设计联络阶段' %}<span class="tag" style="background:#f3e8ff;color:#7c3aed;">设计联络阶段</span>
+  {% elif s == '调试中' %}<span class="tag amber">调试中</span>
+  {% elif s == '实施中' %}<span class="tag blue">实施中</span>
+  {% elif s == '已结束' %}<span class="tag green">已结束</span>
+  {% elif s == '售后中' %}<span class="tag blue">售后中</span>
+  {% else %}<span class="tag gray">{{ s }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro task_status_tag(s) %}
+  {% if s == '待开始' %}<span class="tag gray">待开始</span>
+  {% elif s == '进行中' %}<span class="tag blue">进行中</span>
+  {% elif s == '已完成' %}<span class="tag green">已完成</span>
+  {% elif s == '阻塞' %}<span class="tag red">阻塞</span>
+  {% else %}<span class="tag gray">{{ s }}</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro sev_tag(s) %}
+  {% if s == '紧急' %}<span class="tag red">紧急</span>
+  {% elif s == '严重' %}<span class="tag amber">严重</span>
+  {% else %}<span class="tag gray">一般</span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+  <p><a class="row-link" href="{{ url_for('projects') }}">← 返回项目列表</a></p>
+  <h1>{{ proj.name }}</h1>
+  <p class="sub">
+    {{ status_tag(proj.status) }}
+    {% if proj.platform %} · 平台：{{ proj.platform }}{% endif %}
+    {% if proj.customer %} · 客户：{{ proj.customer }}{% endif %}
+    {% if proj_members %} · 实施人员：{{ proj_members|join('、') }}{% endif %}
+  </p>
+
+  <div class="panel">
+    <div class="grid cards-4">
+      <div class="stat"><div class="l">开始日期</div><div class="n" style="font-size:20px;">{{ fmtDate(proj.start_date) }}</div></div>
+      <div class="stat"><div class="l">计划结束</div><div class="n" style="font-size:20px;">{{ fmtDate(proj.plan_end_date) }}</div></div>
+      <div class="stat"><div class="l">实际结束</div><div class="n" style="font-size:20px;">{{ fmtDate(proj.actual_end_date) }}</div></div>
+      <div class="stat"><div class="l">任务 / 故障</div><div class="n" style="font-size:20px;">{{ tasks|length }} / {{ faults|length }}</div></div>
+    </div>
+    {% if proj.description %}<p class="muted" style="margin-top:14px;">{{ proj.description }}</p>{% endif %}
+  </div>
+
+  <!-- 工时统计 -->
+  <div class="panel">
+    <h2>工时统计（人/天）</h2>
+    <div class="grid cards-4">
+      <div class="stat brand"><div class="n">{{ "%.1f"|format(hours_total) }}</div><div class="l">总工时（任务+故障）</div></div>
+      <div class="stat ok"><div class="n">{{ "%.1f"|format(hours_remote) }}</div><div class="l">远程支持</div></div>
+      <div class="stat warn"><div class="n">{{ "%.1f"|format(hours_onsite) }}</div><div class="l">出差现场支持</div></div>
+      <div class="stat" style="border-color:#7c3aed;"><div class="n" style="color:#7c3aed;">{{ "%.1f"|format(hours_outside) }}</div><div class="l">外出现场支持</div></div>
+    </div>
+    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; gap: 24px; flex-wrap: wrap; align-items: center;">
+      <span style="color: var(--muted); font-size: 13px;">其中故障排查支持：</span>
+      <span style="font-weight: 600;">总计 <span style="color: var(--bad); font-size: 18px;">{{ "%.1f"|format(fault_hours_total) }}</span> 人/天</span>
+      <span style="color: var(--muted);">|</span>
+      <span>远程响应 <b>{{ "%.1f"|format(fault_hours_remote) }}</b></span>
+      <span>出差现场响应 <b>{{ "%.1f"|format(fault_hours_onsite) }}</b></span>
+      <span>外出现场响应 <b>{{ "%.1f"|format(fault_hours_outside) }}</b></span>
+    </div>
+  </div>
+
+  <!-- 调试/实施任务 -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0;">调试 / 实施任务</h2>
+      <div class="spacer"></div>
+      <button class="btn" onclick="newTask()">+ 新增任务</button>
+    </div>
+    <table>
+      <tr><th>任务</th><th>类型</th><th>参与人员</th><th>支持方式</th><th>工时(人/天)</th><th>开始</th><th>计划完成</th><th>实际完成</th><th>状态</th><th></th></tr>
+      {% for t in tasks %}
+      <tr>
+        <td class="note-cell">{{ t.title }}<br><span class="muted" style="font-size:12px;">{{ t.note or '' }}</span></td>
+        <td>{{ t.category }}</td>
+        <td>{{ t.assignee or '—' }}</td>
+        <td>{{ t.support_mode or '远程支持' }}</td>
+        <td>{{ "%.1f"|format(t.work_hours or 0) if t.work_hours else '—' }}</td>
+        <td>{{ fmtDate(t.start_date) }}</td>
+        <td>{{ fmtDate(t.plan_end_date) }}</td>
+        <td>{{ fmtDate(t.actual_end_date) }}</td>
+        <td>{{ task_status_tag(t.status) }}</td>
+        <td class="actions">
+          <button class="btn ghost sm" onclick="editTask({{ t.id }})">编辑</button>
+          <button class="btn danger sm" onclick="delTask({{ t.id }})">删除</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10"><div class="empty">暂无任务</div></td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <!-- 设备清单 -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0;">设备清单</h2>
+      <div class="spacer"></div>
+      <button class="btn" onclick="newDevice()">+ 新增设备</button>
+    </div>
+    <table>
+      <tr><th>设备型号</th><th>数量</th><th>备注</th><th></th></tr>
+      {% for dv in devices %}
+      <tr>
+        <td>{{ dv.model }}</td>
+        <td>{{ dv.quantity }}</td>
+        <td class="note-cell">{{ dv.note or '—' }}</td>
+        <td class="actions">
+          <button class="btn ghost sm" onclick="editDevice({{ dv.id }})">编辑</button>
+          <button class="btn danger sm" onclick="delDevice({{ dv.id }})">删除</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4"><div class="empty">暂无设备清单，点击右上角「新增设备」登记本项目所用设备</div></td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <!-- 售后故障 -->
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0;">故障排查支持</h2>
+      <div class="spacer"></div>
+      <button class="btn" onclick="newFault()">+ 登记故障</button>
+    </div>
+    <table>
+      <tr><th>故障描述</th><th>级别</th><th>状态</th><th>处理人</th><th>报告</th><th>响应</th><th>响应方式</th><th>解决</th><th>工时(人/天)</th><th></th></tr>
+      {% for f in faults %}
+      <tr>
+        <td class="note-cell">{{ f.title }}<br><span class="muted" style="font-size:12px;">{{ f.note or '' }}</span></td>
+        <td>{{ sev_tag(f.severity) }}</td>
+        <td>{{ f.status }}</td>
+        <td>{{ f.handler or '—' }}</td>
+        <td>{{ fmtDate(f.reported_date) }}</td>
+        <td>{{ fmtDate(f.response_date) }}</td>
+        <td>{{ f.response_mode or '—' }}</td>
+        <td>{{ fmtDate(f.resolved_date) }}</td>
+        <td>{{ "%.1f"|format(f.work_hours or 0) if f.work_hours else '—' }}</td>
+        <td class="actions">
+          <button class="btn ghost sm" onclick="editFault({{ f.id }})">编辑</button>
+          <button class="btn danger sm" onclick="delFault({{ f.id }})">删除</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10"><div class="empty">暂无售后故障记录</div></td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+<script>
+const PID = {{ proj.id }};
+const CATS = {{ TASK_CATEGORY|tojson }};
+const TSTAT = {{ TASK_STATUS|tojson }};
+const SMODES = {{ TASK_SUPPORT_MODE|tojson }};
+const SEVS = {{ FAULT_SEVERITY|tojson }};
+const FSTAT = {{ FAULT_STATUS|tojson }};
+const FRMODES = {{ FAULT_RESPONSE_MODE|tojson }};
+const TODAY = "{{ today }}";
+// 服务端序列化任务/故障映射，编辑时按 id 取数，避免内联 JSON 引号截断
+const TASKS = {};
+( {{ tasks|tojson }} ).forEach(t => { TASKS[t.id] = t; });
+const FAULTS = {};
+( {{ faults|tojson }} ).forEach(f => { FAULTS[f.id] = f; });
+const DEVICES = {};
+( {{ devices|tojson }} ).forEach(d => { DEVICES[d.id] = d; });
+
+function taskForm(t){
+  t = t || {};
+  const cat = CATS.map(c=>`<option ${c===t.category?'selected':''}>${c}</option>`).join('');
+  const st = TSTAT.map(s=>`<option ${s===t.status?'selected':''}>${s}</option>`).join('');
+  const sm = SMODES.map(m=>`<option ${m===t.support_mode?'selected':''}>${m}</option>`).join('');
+  const isEdit = !!t.id;
+  return `<h3>${isEdit?'编辑任务':'新增任务'}</h3>
+    <div class="form-grid">
+      <div class="full"><label>任务标题 *</label><input id="t_title" value="${t.title||''}"></div>
+      <div><label>类型</label><select id="t_cat">${cat}</select></div>
+      <div><label>参与人员</label><input id="t_assignee" value="${t.assignee||''}"></div>
+      <div><label>支持方式</label><select id="t_smode">${sm}</select></div>
+      <div><label>工时（人/天）</label><input id="t_hours" type="number" step="0.5" min="0" value="${t.work_hours||0}"></div>
+      <div><label>开始日期</label><input id="t_start" type="date" value="${t.start_date||''}"></div>
+      <div><label>计划完成日期</label><input id="t_plan_end" type="date" value="${t.plan_end_date||''}"></div>
+      <div><label>实际完成日期</label><input id="t_actual_end" type="date" value="${t.actual_end_date||''}"></div>
+      <div><label>状态</label><select id="t_status">${st}</select></div>
+      <div class="full"><label>备注</label><textarea id="t_note" rows="2">${t.note||''}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn" onclick="saveTask(${t.id||null})">保存</button></div>`;
+}
+function newTask(){ openModal(taskForm()); }
+function editTask(id){ openModal(taskForm(TASKS[id])); }
+async function saveTask(id){
+  const data={ project_id:PID, title:document.getElementById('t_title').value.trim(),
+    category:document.getElementById('t_cat').value, assignee:document.getElementById('t_assignee').value.trim(),
+    support_mode:document.getElementById('t_smode').value,
+    work_hours: parseFloat(document.getElementById('t_hours').value) || 0,
+    start_date:document.getElementById('t_start').value, plan_end_date:document.getElementById('t_plan_end').value,
+    actual_end_date:document.getElementById('t_actual_end').value, status:document.getElementById('t_status').value,
+    note:document.getElementById('t_note').value.trim() };
+  if(!data.title){ alert('任务标题不能为空'); return; }
+  if(id){ if(await apiCall('/api/tasks/'+id,'PUT',data)) location.reload(); }
+  else { if(await apiCall('/api/tasks','POST',data)) location.reload(); }
+}
+async function delTask(id){ if(!confirm('删除该任务？')) return; if(await apiCall('/api/tasks/'+id,'DELETE',{})) location.reload(); }
+
+function faultForm(f){
+  f = f || {};
+  const sev = SEVS.map(s=>`<option ${s===f.severity?'selected':''}>${s}</option>`).join('');
+  const st = FSTAT.map(s=>`<option ${s===f.status?'selected':''}>${s}</option>`).join('');
+  const rm = FRMODES.map(m=>`<option ${m===f.response_mode?'selected':''}>${m}</option>`).join('');
+  const isEdit = !!f.id;
+  return `<h3>${isEdit?'编辑故障':'登记故障'}</h3>
+    <div class="form-grid">
+      <div class="full"><label>故障描述 *</label><input id="f_title" value="${f.title||''}"></div>
+      <div><label>级别</label><select id="f_sev">${sev}</select></div>
+      <div><label>状态</label><select id="f_status">${st}</select></div>
+      <div><label>处理人</label><input id="f_handler" value="${f.handler||''}"></div>
+      <div><label>报告日期</label><input id="f_rep" type="date" value="${f.reported_date||TODAY}"></div>
+      <div><label>响应日期</label><input id="f_rdate" type="date" value="${f.response_date||''}"></div>
+      <div><label>响应方式</label><select id="f_rmode">${rm}</select></div>
+      <div><label>解决日期</label><input id="f_res" type="date" value="${f.resolved_date||''}"></div>
+      <div><label>工时（人/天）</label><input id="f_hours" type="number" step="0.5" min="0" value="${f.work_hours||0}"></div>
+      <div class="full"><label>备注</label><textarea id="f_note" rows="2">${f.note||''}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn" onclick="saveFault(${f.id||null})">保存</button></div>`;
+}
+function newFault(){ openModal(faultForm()); }
+function editFault(id){ openModal(faultForm(FAULTS[id])); }
+async function saveFault(id){
+  const data={ project_id:PID, title:document.getElementById('f_title').value.trim(),
+    severity:document.getElementById('f_sev').value, status:document.getElementById('f_status').value,
+    handler:document.getElementById('f_handler').value.trim(),
+    reported_date:document.getElementById('f_rep').value,
+    response_date:document.getElementById('f_rdate').value,
+    response_mode:document.getElementById('f_rmode').value,
+    resolved_date:document.getElementById('f_res').value,
+    work_hours: parseFloat(document.getElementById('f_hours').value) || 0,
+    note:document.getElementById('f_note').value.trim() };
+  if(!data.title){ alert('故障描述不能为空'); return; }
+  if(id){ if(await apiCall('/api/faults/'+id,'PUT',data)) location.reload(); }
+  else { if(await apiCall('/api/faults','POST',data)) location.reload(); }
+}
+async function delFault(id){ if(!confirm('删除该故障记录？')) return; if(await apiCall('/api/faults/'+id,'DELETE',{})) location.reload(); }
+
+function deviceForm(d){
+  d = d || {};
+  const isEdit = !!d.id;
+  return `<h3>${isEdit?'编辑设备':'新增设备'}</h3>
+    <div class="form-grid">
+      <div class="full"><label>设备型号 *</label><input id="d_model" value="${d.model||''}"></div>
+      <div><label>数量</label><input id="d_qty" type="number" min="0" value="${d.quantity||0}"></div>
+      <div class="full"><label>备注</label><textarea id="d_note" rows="2">${d.note||''}</textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn ghost" onclick="closeModal()">取消</button>
+    <button class="btn" onclick="saveDevice(${d.id||null})">保存</button></div>`;
+}
+function newDevice(){ openModal(deviceForm()); }
+function editDevice(id){ openModal(deviceForm(DEVICES[id])); }
+async function saveDevice(id){
+  const data={ project_id:PID, model:document.getElementById('d_model').value.trim(),
+    quantity: document.getElementById('d_qty').value || 0,
+    note:document.getElementById('d_note').value.trim() };
+  if(!data.model){ alert('设备型号不能为空'); return; }
+  if(id){ if(await apiCall('/api/devices/'+id,'PUT',data)) location.reload(); }
+  else { if(await apiCall('/api/devices','POST',data)) location.reload(); }
+}
+async function delDevice(id){ if(!confirm('删除该设备记录？')) return; if(await apiCall('/api/devices/'+id,'DELETE',{})) location.reload(); }
+</script>
+{% endblock %}

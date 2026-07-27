@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+*.db-journal
+preview.pdf
+pm.db.bak
+*.db-journal

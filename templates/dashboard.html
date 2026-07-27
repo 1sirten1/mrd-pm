@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}总体概览{% endblock %}
+
+{% block content %}
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:4px;">
+    <div style="width:140px;height:48px;display:flex;align-items:center;justify-content:flex-start;flex-shrink:0;">
+      <img src="/static/logo.png" style="height:46px;width:auto;">
+    </div>
+    <div>
+      <h1 style="margin:0;">总体概览</h1>
+      <p class="sub" style="margin:4px 0 0;">覆盖全部项目从立项到调试、实施、售后的全生命周期管理。</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <span style="font-size:13px;color:var(--muted);">所属平台：</span>
+    <select id="globalPlatform" onchange="filterByPlatform(this.value)" style="width:140px;">
+      <option value="">全部平台</option>
+      {% for p in PLATFORM_OPTIONS %}
+      <option value="{{ p }}" {% if p == current_platform %}selected{% endif %}>{{ p }}</option>
+      {% endfor %}
+    </select>
+    <div class="spacer"></div>
+    <button class="btn ghost" onclick="downloadExport()">导出</button>
+    <button class="btn ghost" onclick="downloadTemplate()">模板</button>
+    <button class="btn" onclick="openImport()">导入</button>
+  </div>
+
+  <div class="grid cards-4">
+    <div class="stat brand"><div class="n">{{ proj_total }}</div><div class="l">项目总数</div></div>
+    <div class="stat warn"><div class="n">{{ blocked_tasks }}</div><div class="l">阻塞任务</div></div>
+    <div class="stat bad"><div class="n">{{ fault_open }}</div><div class="l">待处理故障</div></div>
+    <div class="stat ok"><div class="n">{{ fault_total - fault_open }}</div><div class="l">已解决故障</div></div>
+  </div>
+
+  <div class="grid cards-2">
+    <div class="panel dist-panel" id="panelProjDist">
+      <h2>项目状态分布</h2>
+      <div class="bar-chart" id="chartProj"></div>
+      <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line);">
+        <h3 style="font-size:14px;margin:0 0 8px;">故障状态分布</h3>
+        <div class="bar-chart" id="chartFault"></div>
+      </div>
+    </div>
+    <div class="panel list-panel">
+      <h2>即将到期任务</h2>
+      {% if upcoming %}
+      <div class="table-wrap"><table>
+        <tr><th>任务</th><th>项目</th><th>计划完成</th><th>状态</th></tr>
+        {% for t in upcoming %}
+        <tr>
+          <td>{{ t.title }}</td>
+          <td><a class="row-link" href="{{ url_for('project_detail', pid=t.project_id) }}">{{ t.project_name }}</a></td>
+          <td>{{ fmtDate(t.plan_end_date) }}</td>
+          <td>{{ t.status }}</td>
+        </tr>
+        {% endfor %}
+      </table></div>
+      {% else %}<div class="empty">暂无即将到期任务</div>{% endif %}
+    </div>
+    <div class="panel list-panel" id="panelPendingTasks">
+      <h2>待完成的调试/实施任务</h2>
+      <div id="pendingTasksList" class="table-wrap">
+        {% if pending_tasks %}
+        <table>
+          {% for t in pending_tasks %}
+          <tr>
+            <td><a class="row-link" href="{{ url_for('project_detail', pid=t.project_id) }}">{{ t.title }}</a></td>
+            <td style="color:var(--muted);">{{ t.project_name }}</td>
+            <td>{{ t.status }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <div class="empty">暂无待完成任务</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="panel list-panel">
+      <h2>未解决售后故障</h2>
+      {% if open_faults %}
+      <div class="table-wrap"><table>
+        <tr><th>故障</th><th>项目</th><th>级别</th><th>状态</th></tr>
+        {% for f in open_faults %}
+        <tr>
+          <td>{{ f.title }}</td>
+          <td><a class="row-link" href="{{ url_for('project_detail', pid=f.project_id) }}">{{ f.project_name }}</a></td>
+          <td>{{ f.severity }}</td>
+          <td>{{ f.status }}</td>
+        </tr>
+        {% endfor %}
+      </table></div>
+      {% else %}<div class="empty">暂无未解决故障</div>{% endif %}
+    </div>
+  </div>
+
+{% block scripts %}
+<style>
+  .bar-chart { display: flex; flex-direction: column; gap: 6px; }
+  .bar-item { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .bar-label { width: 72px; font-size: 12px; color: var(--ink); text-align: right; flex-shrink: 0; white-space: nowrap; }
+  .bar-track { flex: 1; height: 22px; background: #eef1f5; border-radius: 4px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; min-width: 2px; }
+  .bar-val { font-size: 12px; font-weight: 700; color: var(--muted); width: 28px; flex-shrink: 0; text-align: left; }
+  .bar-fill.c0 { background: #9aa5b9; }
+  .bar-fill.c1 { background: #a78bfa; }
+  .bar-fill.c2 { background: #f0a020; }
+  .bar-fill.c3 { background: #2f6fed; }
+  .bar-fill.c4 { background: #2bb673; }
+  .bar-fill.c5 { background: #2f6fed; }
+  .bar-fill.f0 { background: #e0483e; }
+  .bar-fill.f1 { background: #f0a020; }
+  .bar-fill.f2 { background: #2bb673; }
+  .grid.cards-2 { gap: 20px; }
+  .grid.cards-4 { gap: 20px; margin-bottom: 20px; }
+  .grid.cards-2 > .panel { height: 380px; display: flex; flex-direction: column; overflow: hidden; }
+  .panel { padding: 20px 24px; margin-bottom: 0; }
+  .grid.cards-2 > .panel h2 { flex-shrink: 0; }
+  .grid.cards-2 > .panel .bar-chart,
+  .grid.cards-2 > .panel .table-wrap,
+  .grid.cards-2 > .panel .empty { flex: 1; overflow-y: auto; min-height: 0; }
+  .dist-panel { display: flex; flex-direction: column; }
+  .dist-panel .bar-chart { flex: 1; }
+  .list-panel { display: flex; flex-direction: column; }
+  .list-panel .table-wrap { flex: 1; overflow-y: auto; }
+</style>
+<script>
+  let currentPlatform = '{{ current_platform }}';
+
+  function filterByPlatform(plat) {
+    currentPlatform = plat;
+    document.getElementById('globalPlatform').value = plat;
+    const url = plat ? '/?platform=' + encodeURIComponent(plat) : '/';
+    window.location.href = url;
+  }
+
+  function renderBarChart(containerId, items, colorPrefix) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!items || items.length === 0 || items.every(i => i.v === 0)) {
+      container.innerHTML = '<div class="empty">暂无数据</div>';
+      return;
+    }
+    const maxVal = Math.max(...items.map(i => i.v), 1);
+    let html = '<div class="bar-chart">';
+    items.forEach((item, idx) => {
+      const pct = Math.round((item.v / maxVal) * 100);
+      html += '<div class="bar-item"><div class="bar-label">' + item.l + '</div><div class="bar-track"><div class="bar-fill ' + colorPrefix + idx + '" style="width:' + pct + '%;"></div></div><div class="bar-val">' + item.v + '</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  (function(){
+    const pdata = {{ proj_by_status_json|safe }};
+    const tags = ['未开始','设计联络阶段','调试中','实施中','已结束','售后中'];
+    renderBarChart('chartProj', tags.map(t => ({ l: t, v: pdata[t] || 0 })), 'c');
+    const fdata = {{ fault_by_status_json|safe }};
+    renderBarChart('chartFault', ['待处理','处理中','已解决'].map(t => ({ l: t, v: fdata[t] || 0 })), 'f');
+  })();
+
+  async function refreshDashboard(){
+    try {
+      const url = currentPlatform ? '/api/dashboard?platform=' + encodeURIComponent(currentPlatform) : '/api/dashboard';
+      const j = await apiJson(url, 'GET');
+      if(!j || !j.ok) return;
+      document.querySelector('.stat.brand .n').textContent = j.proj_total;
+      document.querySelector('.stat.warn .n').textContent = j.blocked_tasks;
+      document.querySelector('.stat.bad .n').textContent = j.fault_open;
+      document.querySelector('.stat.ok .n').textContent = (j.fault_total - j.fault_open);
+
+      const pMap = {};
+      (j.proj_by_status||[]).forEach(r => { pMap[r.status] = r.c; });
+      const tags = ['未开始','设计联络阶段','调试中','实施中','已结束','售后中'];
+      renderBarChart('chartProj', tags.map(t => ({ l: t, v: pMap[t] || 0 })), 'c');
+
+      const fMap = {};
+      const resolvedCount = j.fault_total - j.fault_open;
+      (j.open_faults||[]).forEach(f => { fMap[f.status] = (fMap[f.status]||0) + 1; });
+      renderBarChart('chartFault', [{ l: '待处理', v: fMap['待处理'] || 0 },{ l: '处理中', v: fMap['处理中'] || 0 },{ l: '已解决', v: resolvedCount }], 'f');
+
+      const panel1 = document.querySelectorAll('.grid.cards-2 .panel')[1];
+      if(panel1 && j.upcoming){
+        let rows = '<table><tr><th>任务</th><th>项目</th><th>计划完成</th><th>状态</th></tr>';
+        if(j.upcoming.length === 0){ rows += '<tr><td colspan="4"><div class="empty">暂无即将到期任务</div></td></tr>'; }
+        else { j.upcoming.forEach(t => { rows += '<tr><td>' + escHtml(t.title) + '</td><td><a class="row-link" href="/project/' + t.project_id + '">' + escHtml(t.project_name) + '</a></td><td>' + fmtDate(t.plan_end_date) + '</td><td>' + t.status + '</td></tr>'; }); }
+        rows += '</table>';
+        panel1.innerHTML = '<h2>即将到期任务</h2><div class="table-wrap">' + rows + '</div>';
+      }
+
+      const pendingDiv = document.getElementById('pendingTasksList');
+      if (pendingDiv && j.pending_tasks) {
+        if (j.pending_tasks.length === 0) { pendingDiv.innerHTML = '<div class="empty">暂无待完成任务</div>'; }
+        else { let rows = '<table>'; j.pending_tasks.forEach(t => { rows += '<tr><td><a class="row-link" href="/project/' + t.project_id + '">' + escHtml(t.title) + '</a></td><td style="color:var(--muted);">' + escHtml(t.project_name) + '</td><td>' + t.status + '</td></tr>'; }); rows += '</table>'; pendingDiv.innerHTML = rows; }
+      }
+
+      const panel3 = document.querySelectorAll('.grid.cards-2 .panel')[3];
+      if(panel3 && j.open_faults){
+        const sevClasses = {'紧急':'red','严重':'amber','一般':'gray'};
+        let rows = '<table><tr><th>故障</th><th>项目</th><th>级别</th><th>状态</th></tr>';
+        if(j.open_faults.length === 0){ rows += '<tr><td colspan="4"><div class="empty">暂无未解决故障</div></td></tr>'; }
+        else { j.open_faults.forEach(f => { rows += '<tr><td>' + escHtml(f.title) + '</td><td><a class="row-link" href="/project/' + f.project_id + '">' + escHtml(f.project_name) + '</a></td><td><span class="tag ' + (sevClasses[f.severity]||'gray') + '">' + f.severity + '</span></td><td>' + f.status + '</td></tr>'; }); }
+        rows += '</table>';
+        panel3.innerHTML = '<h2>未解决售后故障</h2><div class="table-wrap">' + rows + '</div>';
+      }
+    } catch(e){}
+  }
+  function escHtml(x){ const d=document.createElement('div'); d.textContent=x||''; return d.innerHTML; }
+  setInterval(refreshDashboard, 30000);
+</script>
+{% endblock %}
+{% endblock %}

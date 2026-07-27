@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}项目实施管理库{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --panel: #ffffff;
+      --ink: #1f2d3d;
+      --muted: #7a869a;
+      --line: #e6eaf0;
+      --brand: #2f6fed;
+      --brand-d: #2257c4;
+      --ok: #2bb673;
+      --warn: #f0a020;
+      --bad: #e0483e;
+      --shadow: 0 1px 3px rgba(20,40,80,.08), 0 4px 16px rgba(20,40,80,.05);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg); color: var(--ink); font-size: 14px;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 210px; background: #1f2a44; color: #cdd6e6; padding: 18px 12px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      transition: width 0.25s ease, padding 0.25s ease;
+    }
+    .sidebar.collapsed { width: 52px; padding: 18px 8px; }
+    .sidebar.collapsed .logo, .sidebar.collapsed .nav-text { display: none; }
+    .sidebar.collapsed a { text-align: center; padding: 10px 4px; font-size: 16px; }
+    .sidebar .nav-icon { display: none; }
+    .sidebar.collapsed .nav-icon { display: inline; }
+    .sidebar .toggle-btn {
+      background: none; border: none; color: #cdd6e6; cursor: pointer; font-size: 18px;
+      padding: 4px 8px; margin-bottom: 8px; border-radius: 6px; text-align: left;
+      transition: background 0.2s;
+    }
+    .sidebar .toggle-btn:hover { background: #2b3a5c; color: #fff; }
+    .sidebar.collapsed .toggle-btn { text-align: center; padding: 4px 2px; }
+    .sidebar .logo { font-size: 16px; font-weight: 700; color: #fff; padding: 6px 10px 18px; line-height: 1.4; white-space: nowrap; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .sidebar .logo-svg { flex-shrink: 0; }
+    .sidebar.collapsed .logo-text { display: none; }
+    .sidebar.collapsed .logo { padding: 6px 4px 12px; gap: 4px; }
+    .sidebar.collapsed .logo-svg svg { width: 24px; height: 24px; }
+    .sidebar a {
+      display: block; color: #cdd6e6; text-decoration: none; padding: 10px 12px;
+      border-radius: 8px; margin-bottom: 4px; font-size: 14px; white-space: nowrap;
+    }
+    .sidebar a:hover { background: #2b3a5c; color: #fff; }
+    .sidebar a.active { background: var(--brand); color: #fff; }
+    .sidebar .spacer { flex: 1; }
+    .sidebar.collapsed .spacer { display: none; }
+    .main { flex: 1; padding: 24px 30px; overflow-x: auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 22px; }
+    .panel h2 { font-size: 16px; margin: 0 0 14px; }
+    .grid { display: grid; gap: 16px; }
+    .cards-4 { grid-template-columns: repeat(4, 1fr); }
+    .cards-2 { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 900px) { .cards-4 { grid-template-columns: repeat(2,1fr);} .cards-2{grid-template-columns:1fr;} .sidebar{display:none;} }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
+    .stat .n { font-size: 28px; font-weight: 700; }
+    .stat .l { color: var(--muted); margin-top: 4px; }
+    .stat.brand .n { color: var(--brand); }
+    .stat.ok .n { color: var(--ok); }
+    .stat.warn .n { color: var(--warn); }
+    .stat.bad .n { color: var(--bad); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+    td.note-cell { white-space: normal; min-width: 120px; max-width: 300px; }
+    table.line-table th, table.line-table td { white-space: nowrap; }
+    table.line-table td.proj-name { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+    .chk-group { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 0; }
+    .chk { display: inline-flex; align-items: center; gap: 4px; font-weight: 400; font-size: 13px; color: var(--ink); cursor: pointer; }
+    .chk input { margin: 0; }
+    .add-member { margin-top: 6px; }
+    th { color: var(--muted); font-weight: 600; font-size: 13px; background: #fafbfd; }
+    tr:hover td { background: #fafcff; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    .toolbar .spacer { flex: 1; }
+    input, select, textarea {
+      font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--line);
+      border-radius: 8px; background: #fff; color: var(--ink); outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--brand); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none;
+      background: var(--brand); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 14px;
+      text-decoration: none;
+    }
+    .btn:hover { background: var(--brand-d); }
+    .btn.ghost { background: #eef2f9; color: var(--ink); }
+    .btn.ghost:hover { background: #e2e8f3; }
+    .btn.sm { padding: 5px 10px; font-size: 13px; }
+    .btn.danger { background: #fff; color: var(--bad); border: 1px solid #f3c4c0; }
+    .btn.danger:hover { background: #fdeceb; }
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .tag.blue { background: #e7f0ff; color: var(--brand-d); }
+    .tag.green { background: #e3f7ee; color: #1d8a5b; }
+    .tag.amber { background: #fdf0d8; color: #b8780c; }
+    .tag.red { background: #fde6e4; color: #c0392b; }
+    .tag.gray { background: #eef1f5; color: #5a6577; }
+    .muted { color: var(--muted); }
+    .row-link { color: var(--brand); text-decoration: none; font-weight: 600; }
+    .row-link:hover { text-decoration: underline; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(20,30,50,.45); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 50; overflow:auto; }
+    .modal-bg.show { display: flex; }
+    .modal { background: #fff; width: 100%; max-width: 560px; border-radius: 14px; box-shadow: var(--shadow); padding: 22px 24px; }
+    .modal h3 { margin: 0 0 16px; font-size: 18px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+    .form-grid label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .form-grid input, .form-grid select, .form-grid textarea { width: 100%; }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .actions a, .actions button { margin-right: 4px; }
+    .flash { background: #e3f7ee; color: #1d8a5b; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; }
+    .empty { color: var(--muted); text-align: center; padding: 26px 0; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar" id="sidebar">
+      <button class="toggle-btn" onclick="toggleSidebar()" title="折叠菜单">&#9776;</button>
+      <div class="logo">
+        <div class="logo-svg"><img src="/static/logo.png" style="height:40px;width:auto;"></div>
+        <span class="logo-text">项目实施管理库</span>
+      </div>
+      <a href="{{ url_for('dashboard') }}" class="{% if active=='dashboard' %}active{% endif %}"><span class="nav-icon">&#128202;</span><span class="nav-text"> 总体概览</span></a>
+      <a href="{{ url_for('projects') }}" class="{% if active=='projects' %}active{% endif %}"><span class="nav-icon">&#128451;</span><span class="nav-text"> 项目管理</span></a>
+      <a href="{{ url_for('faults_view') }}" class="{% if active=='faults' %}active{% endif %}"><span class="nav-icon">&#128295;</span><span class="nav-text"> 故障排查</span></a>
+      <div class="spacer"></div>
+      <a href="{{ url_for('logout') }}" style="color:#7a8aaa;font-size:13px;"><span class="nav-text">退出登录</span></a>
+    </nav>
+    <main class="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <div class="modal-bg" id="modalBg">
+    <div class="modal" id="modalBox"></div>
+  </div>
+
+  <script>
+    const modalBg = document.getElementById('modalBg');
+    const modalBox = document.getElementById('modalBox');
+    function openModal(html) { modalBox.innerHTML = html; modalBg.classList.add('show'); }
+    function closeModal() { modalBg.classList.remove('show'); }
+    modalBg.addEventListener('click', e => { if (e.target === modalBg) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    async function apiCall(url, method, data) {
+      const r = await fetch(url, {
+        method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+      });
+      const j = await r.json();
+      if (!j.ok) { alert(j.msg || '操作失败'); return false; }
+      return true;
+    }
+    async function apiJson(url, method, data) {
+      const r = await fetch(url, {
+        method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+      });
+      const j = await r.json();
+      if (!j.ok) { alert(j.msg || '操作失败'); return null; }
+      return j;
+    }
+    function fmtDate(s){ return s ? s : '-'; }
+
+    function toggleSidebar() {
+      const sb = document.getElementById('sidebar');
+      sb.classList.toggle('collapsed');
+      localStorage.setItem('sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+    }
+    (function() {
+      if (localStorage.getItem('sidebar_collapsed') === '1') {
+        document.getElementById('sidebar').classList.add('collapsed');
+      }
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

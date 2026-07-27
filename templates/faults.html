@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% set active = "faults" %}
+{% block title %}故障排查 · 项目实施管理库{% endblock %}
+
+{% macro sev_tag(s) %}
+  {% if s == '紧急' %}<span class="tag red">紧急</span>
+  {% elif s == '严重' %}<span class="tag amber">严重</span>
+  {% else %}<span class="tag gray">一般</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro fstatus_tag(s) %}
+  {% if s == '待处理' %}<span class="tag red">待处理</span>
+  {% elif s == '处理中' %}<span class="tag amber">处理中</span>
+  {% else %}<span class="tag green">已解决</span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+  <h1>故障排查</h1>
+  <p class="sub">跨项目查看所有售后故障，按严重级别与状态跟踪处理进度。</p>
+
+  <div class="toolbar">
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <select name="platform" onchange="this.form.submit()">
+        <option value="">全部平台</option>
+        {% for p in PLATFORM_OPTIONS %}<option value="{{ p }}" {% if p==platform %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+      <select name="status" onchange="this.form.submit()">
+        <option value="">全部状态</option>
+        {% for s in FAULT_STATUS %}<option value="{{ s }}" {% if s==status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+      <button class="btn ghost" type="submit">筛选</button>
+    </form>
+  </div>
+
+  <div class="panel" style="padding:0;overflow:hidden;">
+    <table>
+      <tr><th>故障描述</th><th>项目</th><th>所属平台</th><th>级别</th><th>状态</th><th>处理人</th><th>报告</th><th>响应</th><th>响应方式</th><th>解决</th></tr>
+      {% for f in faults %}
+      <tr>
+        <td>
+          <a class="row-link" href="{{ url_for('project_detail', pid=f.project_id) }}">{{ f.title }}</a>
+          {% if f.note %}<br><span class="muted" style="font-size:12px;">{{ f.note }}</span>{% endif %}
+        </td>
+        <td><a class="row-link" href="{{ url_for('project_detail', pid=f.project_id) }}">{{ f.project_name }}</a></td>
+        <td>{{ f.platform or '—' }}</td>
+        <td>{{ sev_tag(f.severity) }}</td>
+        <td>{{ fstatus_tag(f.status) }}</td>
+        <td>{{ f.handler or '—' }}</td>
+        <td>{{ fmtDate(f.reported_date) }}</td>
+        <td>{{ fmtDate(f.response_date) }}</td>
+        <td>{{ f.response_mode or '—' }}</td>
+        <td>{{ fmtDate(f.resolved_date) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10"><div class="empty">暂无故障记录</div></td></tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endblock %}
