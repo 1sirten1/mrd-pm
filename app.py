@@ -13,8 +13,6 @@ import os
 import sqlite3
 from datetime import datetime, date
 
-import pandas as pd
-
 from flask import (
     Flask, request, jsonify, render_template,
     redirect, url_for, flash, send_file, session
@@ -1100,6 +1098,7 @@ def api_import():
     if not f:
         return jsonify(ok=False, msg="未收到文件"), 400
     try:
+        import pandas as pd
         xls = pd.read_excel(BytesIO(f.read()), sheet_name=None)
     except Exception as e:
         return jsonify(ok=False, msg="文件解析失败：" + str(e)), 400
