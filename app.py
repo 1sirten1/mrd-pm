@@ -584,59 +584,57 @@ def project_detail(pid):
     date_end = request.args.get("date_end", "")
     task_date_where = ""
     fault_date_where = ""
-    date_args = []
+    task_args = []
+    fault_args = []
     if date_start:
         task_date_where += " AND (start_date >= ? OR plan_end_date >= ?)"
-        fault_date_where += " AND (reported_date >= ? OR resolved_date >= ?)"
-        date_args = [date_start, date_start, date_start, date_start]
+        fault_date_where += " AND (reported_date >= ? OR response_date >= ?)"
+        task_args += [date_start, date_start]
+        fault_args += [date_start, date_start]
     if date_end:
         task_date_where += " AND (start_date <= ? OR plan_end_date <= ?)"
-        fault_date_where += " AND (reported_date <= ? OR resolved_date <= ?)"
-        date_args += [date_end, date_end, date_end, date_end]
+        fault_date_where += " AND (reported_date <= ? OR response_date <= ?)"
+        task_args += [date_end, date_end]
+        fault_args += [date_end, date_end]
 
     task_hours_total = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM tasks WHERE project_id = ?" + task_date_where,
-        (pid, *date_args[:2] if date_start else *(), *date_args[2:4] if date_end else ())
+        (pid,) + tuple(task_args)
     ).fetchone()[0]
 
     task_hours_remote = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM tasks WHERE project_id = ? AND support_mode = '远程支持'" + task_date_where,
-        (pid, *date_args[:2] if date_start else *(), *date_args[2:4] if date_end else ())
+        (pid,) + tuple(task_args)
     ).fetchone()[0]
 
     task_hours_onsite = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM tasks WHERE project_id = ? AND support_mode = '出差现场支持'" + task_date_where,
-        (pid, *date_args[:2] if date_start else *(), *date_args[2:4] if date_end else ())
+        (pid,) + tuple(task_args)
     ).fetchone()[0]
 
     task_hours_outside = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM tasks WHERE project_id = ? AND support_mode = '外出现场支持'" + task_date_where,
-        (pid, *date_args[:2] if date_start else *(), *date_args[2:4] if date_end else ())
+        (pid,) + tuple(task_args)
     ).fetchone()[0]
-
-    # 故障工时日期过滤用 reported_date 和 resolved_date
-    fds = [date_start, date_start] if date_start else []
-    fde = [date_end, date_end] if date_end else []
-    f_args = tuple(fds + fde)
 
     fault_hours_total = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM faults WHERE project_id = ?" + fault_date_where,
-        (pid, *f_args)
+        (pid,) + tuple(fault_args)
     ).fetchone()[0]
 
     fault_hours_remote = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM faults WHERE project_id = ? AND response_mode = '远程响应'" + fault_date_where,
-        (pid, *f_args)
+        (pid,) + tuple(fault_args)
     ).fetchone()[0]
 
     fault_hours_onsite = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM faults WHERE project_id = ? AND response_mode = '出差现场响应'" + fault_date_where,
-        (pid, *f_args)
+        (pid,) + tuple(fault_args)
     ).fetchone()[0]
 
     fault_hours_outside = cur.execute(
         "SELECT COALESCE(SUM(work_hours), 0) FROM faults WHERE project_id = ? AND response_mode = '外出现场响应'" + fault_date_where,
-        (pid, *f_args)
+        (pid,) + tuple(fault_args)
     ).fetchone()[0]
 
     # 合并总工时
