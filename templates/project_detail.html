@@ -51,7 +51,17 @@
 
   <!-- 工时统计 -->
   <div class="panel">
-    <h2>工时统计（人/天）</h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <h2 style="margin:0;">工时统计（人/天）</h2>
+      <form method="get" style="display:flex;gap:8px;align-items:center;">
+        <input type="hidden" name="pid" value="">
+        <input type="date" name="date_start" value="{{ date_start }}" style="font-size:13px;width:130px;" title="开始日期">
+        <span style="color:var(--muted);">至</span>
+        <input type="date" name="date_end" value="{{ date_end }}" style="font-size:13px;width:130px;" title="结束日期">
+        <button class="btn sm ghost" type="submit">筛选</button>
+        {% if date_start or date_end %}<a href="?" class="btn sm ghost">清除</a>{% endif %}
+      </form>
+    </div>
     <div class="grid cards-4">
       <div class="stat brand"><div class="n">{{ "%.1f"|format(hours_total) }}</div><div class="l">总工时（任务+故障）</div></div>
       <div class="stat ok"><div class="n">{{ "%.1f"|format(hours_remote) }}</div><div class="l">远程支持</div></div>
